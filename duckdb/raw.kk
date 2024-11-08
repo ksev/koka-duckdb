@@ -128,6 +128,9 @@ pub extern duckdb-data-read-uinteger( data : data, row : int ) : int
 
 pub extern duckdb-data-read-big-uint( data : data, row : int ) : int
   c "kk_duckdb_data_read_big_uint"  
+  
+pub extern duckdb-data-read-varchar( data : data, row : int ) : string
+  c "kk_duckdb_data_read_varchar"  
 
 pub extern duckdb-vector-get-column-type( vector : vector ) : logical-type
   c "kk_duckdb_vector_get_column_type"

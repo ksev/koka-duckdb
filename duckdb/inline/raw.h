@@ -39,10 +39,9 @@ kk_duckdb_raw__result kk_duckdb_query(kk_duckdb_raw__connection connection,
   duckdb_state state;
   duckdb_result res;
 
-  bool should_free;
-  const char *query_c = kk_string_to_qutf8_borrow(query, &should_free, ctx);
-
-  state = duckdb_query((duckdb_connection)connection.inner, query_c, &res);
+  kk_with_string_as_qutf8_borrow(query, query_c, ctx) {
+    state = duckdb_query((duckdb_connection)connection.inner, query_c, &res);
+  }
 
   if (state == DuckDBError) {
     return kk_duckdb_raw__new_Result((intptr_t)NULL, ctx);
@@ -257,6 +256,18 @@ kk_integer_t kk_duckdb_data_read_big_uint(kk_duckdb_raw__data data, kk_integer_t
   uint64_t value = ((uint64_t*)data.inner)[col];
   
   return kk_integer_from_bigu64(value, ctx);
+}
+
+kk_string_t kk_duckdb_data_read_varchar(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  duckdb_string_t str = ((duckdb_string_t*)data.inner)[col];
+
+  if (duckdb_string_is_inlined(str)) {
+    return kk_string_alloc_from_qutf8n(str.value.inlined.length, str.value.inlined.inlined, ctx);
+  } 
+
+  return kk_string_alloc_from_qutf8n(str.value.pointer.length, str.value.pointer.ptr,  ctx);
 }
 
 /**

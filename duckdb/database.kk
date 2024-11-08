@@ -8,6 +8,7 @@ import std/core/vector
 pub effect query-result
   fun read-int( ordinal : int ) : maybe<int>
   fun read-bool( ordinal : int ) : maybe<bool>
+  fun read-string( ordinal : int ) : maybe<string>
 
 pub effect duckdb<e>
   fun query( sql : string, cb : () -> <query-result|e> () ) : ()
@@ -70,6 +71,13 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
             if state.type-id != 1 
             then throw("Column cannot be read as boolean")
             else data.duckdb-data-read-boolean(row)
+
+          fun read-string(ord)
+            with state <- valid-col(cols, ord, row)
+            val data = state.data
+            if state.type-id != 17 
+            then throw("Column cannot be read as varchar")
+            else data.duckdb-data-read-varchar(row)
 
         result-action()
         
