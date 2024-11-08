@@ -4,7 +4,7 @@ extern import
   c { syslib = "duckdb"}
 
 extern import 
-  c file "inline/duckdb.h"
+  c file "inline/raw.h"
 
 pub value struct database
   inner : intptr_t
@@ -25,6 +25,9 @@ pub value struct data
   inner : intptr_t
 
 pub value struct validity
+  inner : intptr_t
+
+pub value struct logical-type
   inner : intptr_t
 
 pub fun data-chunk/is-done( chunk : data-chunk ) : bool
@@ -99,6 +102,35 @@ pub extern duckdb-vector-get-validity( vector : vector ) : validity
 pub extern duckdb-validity-row-is-valid( validity : validity, row : int ) : bool
   c "kk_duckdb_validity_row_is_valid"
 
+pub extern duckdb-data-read-boolean( data : data, row : int ) : bool
+  c "kk_duckdb_data_read_boolean"
+
+pub extern duckdb-data-read-tiny-int( data : data, row : int ) : int
+  c "kk_duckdb_data_read_tiny_int"
+
+pub extern duckdb-data-read-small-int( data : data, row : int ) : int
+  c "kk_duckdb_data_read_small_int"
+
 pub extern duckdb-data-read-integer( data : data, row : int ) : int
   c "kk_duckdb_data_read_integer"
 
+pub extern duckdb-data-read-big-int( data : data, row : int ) : int
+  c "kk_duckdb_data_read_big_int"
+
+pub extern duckdb-data-read-tiny-uint( data : data, row : int ) : int
+  c "kk_duckdb_data_read_tiny_uint"
+
+pub extern duckdb-data-read-small-uint( data : data, row : int ) : int
+  c "kk_duckdb_data_read_small_uint"
+
+pub extern duckdb-data-read-uinteger( data : data, row : int ) : int
+  c "kk_duckdb_data_read_uinteger"
+
+pub extern duckdb-data-read-big-uint( data : data, row : int ) : int
+  c "kk_duckdb_data_read_big_uint"  
+
+pub extern duckdb-vector-get-column-type( vector : vector ) : logical-type
+  c "kk_duckdb_vector_get_column_type"
+
+pub extern duckdb-get-type-id( lt : logical-type ) : int
+  c "kk_duckdb_get_type_id"

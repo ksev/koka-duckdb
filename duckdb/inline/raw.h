@@ -185,10 +185,90 @@ bool kk_duckdb_validity_row_is_valid(kk_duckdb_raw__validity val, kk_integer_t i
   return duckdb_validity_row_is_valid((uint64_t*)val.inner, col);
 }
 
+/**
+ * READ COLUMNS BLOCK
+ */
+
+bool kk_duckdb_data_read_boolean(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  return ((bool*)data.inner)[col];
+}
+
+kk_integer_t kk_duckdb_data_read_tiny_int(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  int8_t value = ((int8_t*)data.inner)[col];
+  
+  return kk_integer_from_big64((int64_t)value, ctx);
+}
+
+kk_integer_t kk_duckdb_data_read_small_int(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  int16_t value = ((int16_t*)data.inner)[col];
+  
+  return kk_integer_from_big64((int64_t)value, ctx);
+}
+
 kk_integer_t kk_duckdb_data_read_integer(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
   idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
 
   int32_t value = ((int32_t*)data.inner)[col];
   
   return kk_integer_from_big64((int64_t)value, ctx);
+}
+
+kk_integer_t kk_duckdb_data_read_big_int(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  int64_t value = ((int64_t*)data.inner)[col];
+  
+  return kk_integer_from_big64(value, ctx);
+}
+
+kk_integer_t kk_duckdb_data_read_tiny_uint(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  uint8_t value = ((uint8_t*)data.inner)[col];
+  
+  return kk_integer_from_bigu64((uint64_t)value, ctx);
+}
+
+kk_integer_t kk_duckdb_data_read_small_uint(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  uint16_t value = ((uint16_t*)data.inner)[col];
+  
+  return kk_integer_from_bigu64((uint64_t)value, ctx);
+}
+
+kk_integer_t kk_duckdb_data_read_uinteger(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  uint32_t value = ((uint32_t*)data.inner)[col];
+  
+  return kk_integer_from_bigu64((uint64_t)value, ctx);
+}
+
+kk_integer_t kk_duckdb_data_read_big_uint(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  uint64_t value = ((uint64_t*)data.inner)[col];
+  
+  return kk_integer_from_bigu64(value, ctx);
+}
+
+/**
+ * Vector metadata and types
+ */
+
+kk_duckdb_raw__logical_type kk_duckdb_vector_get_column_type(kk_duckdb_raw__vector val, kk_context_t *ctx) {
+  intptr_t ty = (intptr_t)duckdb_vector_get_column_type((duckdb_vector)val.inner);
+  return kk_duckdb_raw__new_Logical_type(ty, ctx);
+}
+
+kk_integer_t kk_duckdb_get_type_id(kk_duckdb_raw__logical_type type, kk_context_t *ctx) {
+  int64_t ty = (int64_t)duckdb_get_type_id((duckdb_logical_type)type.inner);
+  return kk_integer_from_big64((int64_t)ty, ctx);
 }

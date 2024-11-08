@@ -1,6 +1,7 @@
 module duckdb/database
 
 import duckdb/raw
+
 import std/core/undiv
 import std/core/vector
 
@@ -12,14 +13,26 @@ pub effect duckdb<e>
   fun query( sql : string, cb : () -> <query-result|e> () ) : ()
   fun execute( sql : string ) : int
 
+struct chunk-state
+  data : data
+  validity : validity
+  ctype : logical-type
+  type-id : int
+
 pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
   val db = raw/duckdb-open()
   val conn = db.duckdb-connect()
 
+  with finally
+    conn.duckdb-disconnect()
+    db.duckdb-close()
+
   with handler
-    fun query(sql, cb)
+    fun query(sql, result-action)
       val res = conn.duckdb-query(sql)
-      with finally { res.duckdb-destroy-result }
+
+      with finally
+        res.duckdb-destroy-result()
 
       with chunk <- traverse-chunks(res)
       val count = chunk.duckdb-data-chunk-get-size()
@@ -29,18 +42,36 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
         val col = chunk.duckdb-data-chunk-get-vector(i)
         val col-data = col.duckdb-vector-get-data()
         val col-validity = col.duckdb-vector-get-validity()
-        (col, col-data, col-validity)
+        val col-type = col.duckdb-vector-get-column-type()
+        val col-type-id = col-type.duckdb-get-type-id()
+        Chunk-state(col-data, col-validity, col-type, col-type-id)
     
       for(count) fn(row)
         with handler
           fun read-int(ord) 
-            val (_, data, valid) = cols.at(ord).unjust
-            if valid.duckdb-validity-row-is-valid(row) 
-            then Just(data.duckdb-data-read-integer(row))
-            else Nothing
+            with state <- valid-col(cols, ord, row)
+            val data = state.data
 
-          fun read-bool(ord) Just(False)
-        cb()
+            match state.type-id
+              2 -> data.duckdb-data-read-tiny-int(row)
+              3 -> data.duckdb-data-read-small-int(row)
+              4 -> data.duckdb-data-read-integer(row)
+              5 -> data.duckdb-data-read-big-int(row)
+              6 -> data.duckdb-data-read-tiny-uint(row)
+              7 -> data.duckdb-data-read-small-uint(row)
+              8 -> data.duckdb-data-read-uinteger(row)
+              9 -> data.duckdb-data-read-big-uint(row)
+              _ -> throw("Column cannot be read as int")
+
+          fun read-bool(ord)
+            with state <- valid-col(cols, ord, row)
+            val data = state.data
+
+            if state.type-id != 1 
+            then throw("Column cannot be read as boolean")
+            else data.duckdb-data-read-boolean(row)
+
+        result-action()
         
     fun execute(sql)
       val result = conn.duckdb-query(sql)
@@ -48,22 +79,18 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
       result.duckdb-destroy-result()
       changed
 
-    return(_) 
-      conn.duckdb-disconnect()
-      db.duckdb-close()
-
   action()
 
-/*
-pub fun build-vector( action : () -> <query-result|e> () ) : e ()
-  with handler
-    fun read-int(ord) 55
-  action()
-  */
-fun traverse-chunks( result : raw/result, cb : (raw/data-chunk) -> e () ) : e ()
+fun valid-col<a>( state : std/core/types/vector<chunk-state>, ord : int, row : int, action : (chunk-state) -> <exn|e> a ) : <exn|e> maybe<a>
+  val st = state.at(ord).unjust
+  if st.validity.duckdb-validity-row-is-valid(row) 
+  then Just(action(st))
+  else Nothing
+
+tail fun traverse-chunks( result : raw/result, action : (raw/data-chunk) -> e () ) : e ()
   val chunk = result.duckdb-fetch-chunk()  
-  if chunk.is-done then ()
-  else 
-    cb(chunk)
-    chunk.duckdb-destroy-data-chunk()   
-    traverse-chunks( result.pretend-decreasing(), cb )
+  
+  if !chunk.is-done then
+    finally { chunk.duckdb-destroy-data-chunk() }
+      action(chunk)    
+    traverse-chunks( result.pretend-decreasing(), action )
