@@ -9,6 +9,7 @@ pub effect query-result
   fun read-int( ordinal : int ) : maybe<int>
   fun read-bool( ordinal : int ) : maybe<bool>
   fun read-string( ordinal : int ) : maybe<string>
+  fun read-float64 ( ordinal : int ) : maybe<float64>
 
 pub effect duckdb<e>
   fun query( sql : string, cb : () -> <query-result|e> () ) : ()
@@ -63,6 +64,14 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
               8 -> data.duckdb-data-read-uinteger(row)
               9 -> data.duckdb-data-read-big-uint(row)
               _ -> throw("Column cannot be read as int")
+
+          fun read-float64(ord)
+            with state <- valid-col(cols, ord, row)
+            val data = state.data
+            
+            if state.type-id != 11 
+            then throw("Column cannot be read as float64")
+            else data.duckdb-data-read-double(row)
 
           fun read-bool(ord)
             with state <- valid-col(cols, ord, row)

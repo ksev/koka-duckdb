@@ -270,6 +270,14 @@ kk_string_t kk_duckdb_data_read_varchar(kk_duckdb_raw__data data, kk_integer_t i
   return kk_string_alloc_from_qutf8n(str.value.pointer.length, str.value.pointer.ptr,  ctx);
 }
 
+double kk_duckdb_data_read_double(kk_duckdb_raw__data data, kk_integer_t idx, kk_context_t *ctx) {
+  idx_t col = (idx_t)kk_integer_clamp64_generic(idx, ctx);
+
+  double value = ((double*)data.inner)[col];
+  
+  return value;
+}
+
 /**
  * Vector metadata and types
  */
