@@ -15,11 +15,9 @@ pub effect duckdb<e>
   fun query( sql : string, cb : () -> <query-result|e> () ) : ()
   fun execute( sql : string ) : int
 
-struct chunk-state
-  data : data
-  validity : validity
-  ctype : logical-type
+value struct column
   type-id : int
+  data : duckdb/raw/data
 
 pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
   val db = raw/duckdb-open()
@@ -38,23 +36,14 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
 
       with chunk <- traverse-chunks(res)
       val count = chunk.duckdb-data-chunk-get-size()
-      val col-count = chunk.duckdb-data-chunk-get-column-count()
-
-      val cols = vector-init(col-count) fn(i)
-        val col = chunk.duckdb-data-chunk-get-vector(i)
-        val col-data = col.duckdb-vector-get-data()
-        val col-validity = col.duckdb-vector-get-validity()
-        val col-type = col.duckdb-vector-get-column-type()
-        val col-type-id = col-type.duckdb-get-type-id()
-        Chunk-state(col-data, col-validity, col-type, col-type-id)
     
       for(count) fn(row)
         with handler
           fun read-int(ord) 
-            with state <- valid-col(cols, ord, row)
-            val data = state.data
+            with col <- column(chunk, ord, row)
+            val data = col.data
 
-            match state.type-id
+            match col.type-id
               2 -> data.duckdb-data-read-tiny-int(row)
               3 -> data.duckdb-data-read-small-int(row)
               4 -> data.duckdb-data-read-integer(row)
@@ -66,27 +55,25 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
               _ -> throw("Column cannot be read as int")
 
           fun read-float64(ord)
-            with state <- valid-col(cols, ord, row)
-            val data = state.data
+            with col <- column(chunk, ord, row)
             
-            if state.type-id != 11 
+            if col.type-id != 11 
             then throw("Column cannot be read as float64")
-            else data.duckdb-data-read-double(row)
+            else col.data.duckdb-data-read-double(row)
 
           fun read-bool(ord)
-            with state <- valid-col(cols, ord, row)
-            val data = state.data
+            with col <- column(chunk, ord, row)
 
-            if state.type-id != 1 
+            if col.type-id != 1
             then throw("Column cannot be read as boolean")
-            else data.duckdb-data-read-boolean(row)
+            else col.data.duckdb-data-read-boolean(row)
 
           fun read-string(ord)
-            with state <- valid-col(cols, ord, row)
-            val data = state.data
-            if state.type-id != 17 
+            with col <- column(chunk, ord, row)
+
+            if col.type-id != 17 
             then throw("Column cannot be read as varchar")
-            else data.duckdb-data-read-varchar(row)
+            else col.data.duckdb-data-read-varchar(row)
 
         result-action()
         
@@ -98,12 +85,23 @@ pub fun duckdb-open( action : () -> <duckdb<<exn|e>>,exn|e> () ) : <exn|e> ()
 
   action()
 
-fun valid-col<a>( state : std/core/types/vector<chunk-state>, ord : int, row : int, action : (chunk-state) -> <exn|e> a ) : <exn|e> maybe<a>
-  val st = state.at(ord).unjust
-  if st.validity.duckdb-validity-row-is-valid(row) 
-  then Just(action(st))
-  else Nothing
+fun column<a>( chunk : duckdb/raw/data-chunk, ord : int, row : int, action : (column) -> <exn|e> a ) : <exn|e> maybe<a>
+  val col-count = chunk.duckdb-data-chunk-get-column-count()
 
+  // First check that we are in range
+  if col-count < 0 || ord >= col-count
+  then throw("Column out of range " ++ ord.show)
+  else 
+    val col = chunk.duckdb-data-chunk-get-vector(ord)
+
+    val validity = col.duckdb-vector-get-validity()
+    val ty = col.duckdb-vector-get-column-type()
+
+    // Check if the colum x row is null
+    if validity.duckdb-validity-row-is-valid(row)
+    then Just(action(Column(ty.duckdb-get-type-id(), col.duckdb-vector-get-data())))
+    else Nothing
+  
 tail fun traverse-chunks( result : raw/result, action : (raw/data-chunk) -> e () ) : e ()
   val chunk = result.duckdb-fetch-chunk()  
   
